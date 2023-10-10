@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 
@@ -43,8 +44,7 @@ def main():
     # todo make better loading for where stuff was left off
 
     print("downloading content")
-    discord.fetchAllFiles()
-    # todo figure out why loop closed error is thrown
+    asyncio.run(discord.asyncFetchAllFiles())
     print("done")
 
 

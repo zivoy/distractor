@@ -14,7 +14,7 @@ from typing import Union
 import aiofiles
 import aiohttp
 import aiosqlite
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 import config
 import sql
@@ -23,7 +23,8 @@ DISCORD_EPOCH = 1420070400000
 URL_REGEX = re.compile(r"https://(?:cdn|media)\.discordapp\.(?:com|net)/attachments/"
                        r"(?P<channelId>\d+)/(?P<elementId>\d+)/(?P<name>[a-zA-Z0-9$\-_.+!*'(),]+)")
 CONTENT_FOLDER = "content"
-MAX_SIZE = 30 * 1024 * 1024  # 30 mb
+
+MAX_SIZE = config.settings.getint("MaxFileSizeMb") * 1024 * 1024
 
 configFolder = os.path.join(config.settings["OutputLocation"], CONTENT_FOLDER)
 if not os.path.exists(configFolder):
@@ -99,30 +100,32 @@ def getfilename(mime_type: str, data: bytes) -> str:
         elif mime_type == "text/x-sh":
             extension = ".sh"
         else:
-            print(f"unsure extension '{mime_type}' on '{name}'")
+            # print
+            tqdm.write(f"unsure extension '{mime_type}' on '{name}'")
             extension = ""
     return f"{name}{extension}"
 
 
 async def downloadFile(session: aiohttp.ClientSession, url: str):
-    async with session.get(url) as resp:
+    async with (session.get(url) as resp):
         if resp.status != 200:
             if resp.status != 404:
-                print(resp.status, url)
+                # print
+                tqdm.write(f"{resp.status} - {url}")
             return None
         contentType = resp.headers["Content-Type"]
-        # charset = None
         if ";" in contentType:
             contentType, *parameters = contentType.split(";")
             # parameters = ";".join(parameters)
-            # charset = parameters.split("charset=")[1]
-            # print(f"charset requested '{charset}' for {url}")
+            # charset = parameters.split("charset=")[1]  # ignoring specified charset, dont really need it
+            # print(f"charset specified '{charset}' for {url}")
 
         size = None
         if "Content-Length" in resp.headers:  # not present in text file for some reason
             size = int(resp.headers["Content-Length"])
             if size > MAX_SIZE:
-                print(f"{size} is too big", url)
+                #print
+                tqdm.write(f"{size} is too big - {url}")
                 return
 
         content = await resp.content.read()
@@ -131,10 +134,6 @@ async def downloadFile(session: aiohttp.ClientSession, url: str):
         name = getfilename(contentType, content)
         fullpath = os.path.join(configFolder, name)
         if not os.path.exists(fullpath):
-            # if charset is not None:  # ignoring since this is not how do it
-            #     async with aiofiles.open(fullpath, mode="w", encoding=charset) as f:  # not sure if this is needed
-            #         await f.write(content.decode(charset))
-            # else:
             async with aiofiles.open(fullpath, mode="wb") as f:
                 await f.write(content)
 
@@ -187,7 +186,4 @@ async def asyncFetchAllFiles():
             await conn.commit()
 
     await conn.close()
-
-
-def fetchAllFiles():
-    asyncio.run(asyncFetchAllFiles())
+    await asyncio.sleep(.2)

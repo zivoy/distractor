@@ -7,7 +7,7 @@ import config
 
 DBFILE = "data.db"
 path = os.path.join(config.settings["OutputLocation"], DBFILE)
-DOWNLOAD_LIMIT = -1  # 10
+DOWNLOAD_LIMIT = config.settings.getint("DownloadLimit")
 
 
 def getConnection():
