@@ -120,10 +120,7 @@ def getfilename(mime_type: str, data: bytes) -> str:
 async def downloadFile(session: aiohttp.ClientSession, url: str):
     async with (session.get(url) as resp):
         if resp.status != 200:
-            if resp.status != 404:
-                # print
-                tqdm.write(f"{resp.status} - {url}")
-            return None
+            return None, "http error", resp.status, url
         contentType = resp.headers["Content-Type"]
         if ";" in contentType:
             contentType, *parameters = contentType.split(";")
@@ -135,9 +132,7 @@ async def downloadFile(session: aiohttp.ClientSession, url: str):
         if "Content-Length" in resp.headers:  # not present in text file for some reason
             size = int(resp.headers["Content-Length"])
             if size > MAX_SIZE:
-                # print
-                tqdm.write(f"{size} is too big - {url}")
-                return
+                return None, "too large", size, url
 
         content = await resp.content.read()
         if size is None:
@@ -156,6 +151,7 @@ async def asyncFetchAllFiles():
     conn = await sql.getConnectionAsync()
     files = await asyncGetLinks(conn)
     tasks = list()
+    failed = list()
     async with aiohttp.ClientSession() as session:
         semaphore = asyncio.Semaphore(50)  # max concurrent requests // 25
 
@@ -176,7 +172,8 @@ async def asyncFetchAllFiles():
 
         for resp in tqdm(asyncio.as_completed(tasks), desc="Downloading assets", total=len(tasks)):
             res = await resp
-            if res is None:
+            if res[0] is None:
+                failed.append(res[1:])
                 continue
             url, contentType, filepath, size = res
 
@@ -197,4 +194,8 @@ async def asyncFetchAllFiles():
             await conn.commit()
 
     await conn.close()
+    print("failed to get:")
+    for i in failed:
+        print(f" {i[0]} ({i[1]}) - {i[2]}")
+
     await asyncio.sleep(.2)

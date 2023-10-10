@@ -36,13 +36,13 @@ def loadChannels(conn):
 def main():
     con = sql.getConnection()
     sql.createDB(con)
-    print("loading channels")
+    print("loading channels", flush=True)
     loadChannels(con)
     con.close()
 
-    print("downloading content")
+    print("downloading content", flush=True)
     asyncio.run(discord.asyncFetchAllFiles())
-    print("done")
+    print("done", flush=True)
 
 
 if __name__ == "__main__":
