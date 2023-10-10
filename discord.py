@@ -1,14 +1,12 @@
 import asyncio
-import csv
+import aiocsv as csv
 import hashlib
-import io
 import json
 import mimetypes
 import os.path
 import re
-import sqlite3
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Union
 
 import aiofiles
@@ -35,52 +33,41 @@ def getDateFromSnowflake(snowflake: Union[str, int]) -> datetime:
     return datetime.fromtimestamp(((int(snowflake) >> 22) + DISCORD_EPOCH) / 1000)
 
 
-def loadChannel(con: sqlite3.Connection, channelDataJsonFile: io.TextIOWrapper, channelDataCSVFile: io.TextIOWrapper):
-    cur = con.cursor()
+async def loadChannel(con: aiosqlite.Connection, folder:str):
+    jsonPath = os.path.join(folder, "channel.json")
+    csvPath = os.path.join(folder, "messages.csv")
 
-    data = json.load(channelDataJsonFile)
+    async with aiofiles.open(jsonPath, encoding="utf8") as jsonFile:
+        data = json.loads(await jsonFile.read())
     cid = data["id"]
     ctype = data["type"]
     name = data["name"] if "name" in data else None
     created = getDateFromSnowflake(cid)
-    cur.execute(sql.INSERT_CHANNEL, (cid, ctype, name, created))
-    con.commit()
+    await con.execute(sql.INSERT_CHANNEL, (cid, ctype, name, created))
+    # await con.commit()
 
-    cur.execute(sql.CHANNEL_LATEST_MESSAGES, (cid, 1))
-    res = cur.fetchone()
-    latestTime = datetime(1, 1, 1)
+    cur = await con.execute(sql.CHANNEL_LATEST_MESSAGES, (cid, 1))
+    res = await cur.fetchone()
+    latestTime = datetime(1, 1, 1, tzinfo=timezone.utc)
     if res is not None:
         latestId, latestTime = res
         latestTime = datetime.fromisoformat(latestTime)
         # print(f"latest stored message in {cid} is id {latestId} from {latestTime}")
 
     messages = list()
-    messagesList = csv.DictReader(channelDataCSVFile)
-    for row in messagesList:
-        time = datetime.fromisoformat(row["Timestamp"])
-        if time <= latestTime:
-            continue
-        content = row["Contents"]
-        attachments = row["Attachments"]
-        messages.append((row["ID"], cid, content if content else None, attachments if attachments else None, time))
-    cur.executemany(sql.INSERT_MESSAGE, messages)
-
-    con.commit()
-
-
-def getLinks(con: sqlite3.Connection):
-    cur = con.cursor()
-    resp = cur.execute(sql.HAS_CDN_CONTENT)
-    res = resp.fetchall()
-    return gatherLinks(res)
+    async with aiofiles.open(csvPath, encoding="utf8") as jsonFile:
+        async for row in csv.AsyncDictReader(jsonFile):
+            time = datetime.fromisoformat(row["Timestamp"])
+            if time <= latestTime:
+                continue
+            content = row["Contents"]
+            attachments = row["Attachments"]
+            messages.append((row["ID"], cid, content if content else None, attachments if attachments else None, time))
+    await con.executemany(sql.INSERT_MESSAGE, messages)
 
 
 async def asyncGetLinks(con: aiosqlite.Connection):
     res = await con.execute_fetchall(sql.HAS_CDN_CONTENT)
-    return gatherLinks(res)
-
-
-def gatherLinks(res):
     data = defaultdict(set)
     for mId, text, att in res:
         for match in URL_REGEX.finditer(text):
@@ -147,8 +134,7 @@ async def downloadFile(session: aiohttp.ClientSession, url: str):
         return url, contentType, os.path.join(CONTENT_FOLDER, name), size
 
 
-async def asyncFetchAllFiles():
-    conn = await sql.getConnectionAsync()
+async def asyncFetchAllFiles(conn: aiosqlite.Connection):
     files = await asyncGetLinks(conn)
     tasks = list()
     failed = list()
@@ -193,7 +179,6 @@ async def asyncFetchAllFiles():
                 await conn.execute(sql.INSERT_CONTENT_LINK, (mId, itemId, attachment))
             await conn.commit()
 
-    await conn.close()
     if failed:
         print("failed to get:")
         for i in failed:

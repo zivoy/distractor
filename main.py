@@ -2,47 +2,44 @@ import asyncio
 import json
 import os
 
-import tqdm
+import aiofiles
+import aiosqlite
+from tqdm.auto import tqdm
 
 import config
 import discord
 import sql
 
 
-def loadChannelFromFolder(conn, folder):
-    with open(os.path.join(folder, "channel.json"), encoding="utf8") as jsonFile:
-        with open(os.path.join(folder, "messages.csv"), encoding="utf8") as csvFile:
-            discord.loadChannel(conn, jsonFile, csvFile)
-
-
-def loadChannels(conn):
+async def loadChannels(conn: aiosqlite.Connection):
     containingFolder = config.settings["SourceFolder"]
-    channels = list(os.scandir(os.path.join(containingFolder, "messages")))
-    for channel in tqdm.tqdm(channels, desc="Loading channels"):
+    tasks = list()
+    for channel in os.scandir(os.path.join(containingFolder, "messages")):
         if channel.is_file():
             continue
         # print("loading", channel.name)
-        loadChannelFromFolder(conn, channel.path)
+        tasks.append(asyncio.create_task(discord.loadChannel(conn, channel.path)))
+
+    await tqdm.gather(*tasks, desc="Loading channels")
+    await conn.commit()
 
     # update channel names
-    curr = conn.cursor()
     with open(os.path.join(containingFolder, "messages", "index.json")) as f:
         data = json.load(f)
         for k, v in data.items():
-            curr.execute(sql.UPDATE_CHANNEL_NAME, (v, k))
-    conn.commit()
+            await conn.execute(sql.UPDATE_CHANNEL_NAME, (v, k))
+    await conn.commit()
 
 
 async def main():
-    con = sql.getConnection()
-    sql.createDB(con)
-    print("loading channels", flush=True)
-    loadChannels(con)
-    con.close()
+    async with aiosqlite.connect(sql.DB_PATH) as conn:
+        await sql.createDB(conn)
+        print("loading channels", flush=True)
+        await loadChannels(conn)
 
-    print("downloading content", flush=True)
-    await discord.asyncFetchAllFiles()
-    print("done", flush=True)
+        print("downloading content", flush=True)
+        await discord.asyncFetchAllFiles(conn)
+        print("done", flush=True)
 
     await asyncio.sleep(.2)  # sleep a bit to let connections wind down
 

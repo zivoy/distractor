@@ -1,22 +1,12 @@
 import os.path
-import sqlite3
 
 import aiosqlite
 
 import config
 
 DBFILE = "data.db"
-path = os.path.join(config.settings["OutputLocation"], DBFILE)
+DB_PATH = os.path.join(config.settings["OutputLocation"], DBFILE)
 DOWNLOAD_LIMIT = config.settings.getint("DownloadLimit")
-
-
-def getConnection():
-    return sqlite3.connect(path)
-
-
-async def getConnectionAsync():
-    return await aiosqlite.connect(path)
-
 
 INSERT_CHANNEL = """
 INSERT OR IGNORE INTO `channels`
@@ -78,9 +68,8 @@ FROM attch
 """
 
 
-def createDB(con: sqlite3.Connection):
-    cur = con.cursor()
-    cur.execute("""
+async def createDB(con: aiosqlite.Connection):
+    await con.execute("""
     CREATE TABLE IF NOT EXISTS `channels` (
         `id`        INT         NOT NULL,
         `type`      INT         NOT NULL,
@@ -92,7 +81,7 @@ def createDB(con: sqlite3.Connection):
     ) WITHOUT ROWID;
     """)
     # list of messages
-    cur.execute("""
+    await con.execute("""
     CREATE TABLE IF NOT EXISTS `messages` (
         `id`            INT         NOT NULL,
         `channelId`     INT         NOT NULL,
@@ -105,7 +94,7 @@ def createDB(con: sqlite3.Connection):
     ) WITHOUT ROWID;
     """)
     # list of images and videos, can post to same post
-    cur.execute("""
+    await con.execute("""
     CREATE TABLE IF NOT EXISTS `content` (
         `id`                INT         NOT NULL,
         `originalChannelId` INT         NOT NULL,
@@ -119,7 +108,7 @@ def createDB(con: sqlite3.Connection):
         PRIMARY KEY (`id`)
     ) WITHOUT ROWID;
     """)
-    cur.execute("""
+    await con.execute("""
      CREATE TABLE IF NOT EXISTS `messageContents` (
          --`id`           INT,
          `messageId`    INT     NOT NULL,
@@ -133,4 +122,4 @@ def createDB(con: sqlite3.Connection):
      );
      """)
 
-    con.commit()
+    await con.commit()
