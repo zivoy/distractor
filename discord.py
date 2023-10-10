@@ -194,8 +194,7 @@ async def asyncFetchAllFiles():
             await conn.commit()
 
     await conn.close()
-    print("failed to get:")
-    for i in failed:
-        print(f" {i[0]} ({i[1]}) - {i[2]}")
-
-    await asyncio.sleep(.2)
+    if failed:
+        print("failed to get:")
+        for i in failed:
+            print(f" {i[0]} ({i[1]}) - {i[2]}")

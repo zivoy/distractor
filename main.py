@@ -33,7 +33,7 @@ def loadChannels(conn):
     conn.commit()
 
 
-def main():
+async def main():
     con = sql.getConnection()
     sql.createDB(con)
     print("loading channels", flush=True)
@@ -41,9 +41,11 @@ def main():
     con.close()
 
     print("downloading content", flush=True)
-    asyncio.run(discord.asyncFetchAllFiles())
+    await discord.asyncFetchAllFiles()
     print("done", flush=True)
+
+    await asyncio.sleep(.2)  # sleep a bit to let connections wind down
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
