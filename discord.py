@@ -1,5 +1,4 @@
 import asyncio
-import aiocsv as csv
 import hashlib
 import json
 import mimetypes
@@ -9,6 +8,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Union
 
+import aiocsv as csv
 import aiofiles
 import aiohttp
 import aiosqlite
@@ -33,7 +33,7 @@ def getDateFromSnowflake(snowflake: Union[str, int]) -> datetime:
     return datetime.fromtimestamp(((int(snowflake) >> 22) + DISCORD_EPOCH) / 1000)
 
 
-async def loadChannel(con: aiosqlite.Connection, folder:str):
+async def loadChannel(con: aiosqlite.Connection, folder: str):
     jsonPath = os.path.join(folder, "channel.json")
     csvPath = os.path.join(folder, "messages.csv")
 
