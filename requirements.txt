@@ -1,0 +1,5 @@
+requests
+aiosqlite
+aiohttp
+aiofiles
+tqdm

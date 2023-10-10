@@ -1,0 +1,6 @@
+content/
+venv/
+
+data.db
+
+.idea/
