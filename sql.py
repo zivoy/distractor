@@ -45,7 +45,13 @@ WHERE `name` is NULL and id = ?;
 """
 URL_IN_CONTENT = """
 SELECT id FROM `content` 
-WHERE url = ?
+WHERE url = ?;
+"""
+CHANNEL_LATEST_MESSAGES = """
+SELECT id, created FROM messages 
+WHERE channelId = ?
+ORDER BY created DESC
+LIMIT ?;
 """
 
 # HAS_CDN_CONTENT = """

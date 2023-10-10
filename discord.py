@@ -44,11 +44,22 @@ def loadChannel(con: sqlite3.Connection, channelDataJsonFile: io.TextIOWrapper, 
     name = data["name"] if "name" in data else None
     created = getDateFromSnowflake(cid)
     cur.execute(sql.INSERT_CHANNEL, (cid, ctype, name, created))
+    con.commit()
+
+    cur.execute(sql.CHANNEL_LATEST_MESSAGES, (cid, 1))
+    res = cur.fetchone()
+    latestTime = datetime(1, 1, 1)
+    if res is not None:
+        latestId, latestTime = res
+        latestTime = datetime.fromisoformat(latestTime)
+        # print(f"latest stored message in {cid} is id {latestId} from {latestTime}")
 
     messages = list()
     messagesList = csv.DictReader(channelDataCSVFile)
     for row in messagesList:
         time = datetime.fromisoformat(row["Timestamp"])
+        if time <= latestTime:
+            continue
         content = row["Contents"]
         attachments = row["Attachments"]
         messages.append((row["ID"], cid, content if content else None, attachments if attachments else None, time))
@@ -124,7 +135,7 @@ async def downloadFile(session: aiohttp.ClientSession, url: str):
         if "Content-Length" in resp.headers:  # not present in text file for some reason
             size = int(resp.headers["Content-Length"])
             if size > MAX_SIZE:
-                #print
+                # print
                 tqdm.write(f"{size} is too big - {url}")
                 return
 

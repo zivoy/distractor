@@ -34,14 +34,11 @@ def loadChannels(conn):
 
 
 def main():
-    if not os.path.exists(sql.path):
-        print("db doesnt exist, creating")
-        con = sql.getConnection()
-        sql.createDB(con)
-        print("loading channels")
-        loadChannels(con)
-        con.close()
-    # todo make better loading for where stuff was left off
+    con = sql.getConnection()
+    sql.createDB(con)
+    print("loading channels")
+    loadChannels(con)
+    con.close()
 
     print("downloading content")
     asyncio.run(discord.asyncFetchAllFiles())
