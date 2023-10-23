@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import shutil
 
 import aiosqlite
 from tqdm.auto import tqdm
@@ -8,10 +9,13 @@ from tqdm.auto import tqdm
 import config
 import discord
 import sql
+import zipfile
 
+async def loadChannels(conn: aiosqlite.Connection, containingFolder=None):
+    if containingFolder is None:
+        containingFolder = config.settings["SourceFolder"]
 
-async def loadChannels(conn: aiosqlite.Connection):
-    containingFolder = config.settings["SourceFolder"]
+    print("loading channels", flush=True)
     tasks = list()
     for channel in os.scandir(os.path.join(containingFolder, "messages")):
         if channel.is_file():
@@ -30,11 +34,31 @@ async def loadChannels(conn: aiosqlite.Connection):
     await conn.commit()
 
 
+# going for the easy route
+async def loadZipChannels(conn: aiosqlite.Connection):
+    tempPath = os.path.join(config.settings["OutputLocation"], "temp")
+    print("extracting messages", flush=True)
+    with zipfile.ZipFile(config.settings["SourceZip"]) as z:
+        for name in z.namelist():
+            if name.startswith("messages/"):
+                z.extract(name, tempPath)
+
+    await loadChannels(conn, tempPath)
+
+    shutil.rmtree(tempPath)
+
+
 async def main():
     async with aiosqlite.connect(sql.DB_PATH) as conn:
         await sql.createDB(conn)
-        print("loading channels", flush=True)
-        await loadChannels(conn)
+
+        if "SourceZip" in config.settings:
+            await loadZipChannels(conn)
+        elif "SourceFolder" in config.settings:
+            await loadChannels(conn)
+        else:
+            print("no source specified", flush=True)
+            return
 
         print("downloading content", flush=True)
         if not os.path.exists(discord.configFolder):

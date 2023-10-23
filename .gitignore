@@ -2,5 +2,6 @@ content/
 venv/
 
 data.db
+temp/
 
 .idea/
