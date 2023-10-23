@@ -25,8 +25,6 @@ CONTENT_FOLDER = "content"
 MAX_SIZE = config.settings.getint("MaxFileSizeMb") * 1024 * 1024
 
 configFolder = os.path.join(config.settings["OutputLocation"], CONTENT_FOLDER)
-if not os.path.exists(configFolder):
-    os.mkdir(configFolder)
 
 
 def getDateFromSnowflake(snowflake: Union[str, int]) -> datetime:

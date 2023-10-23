@@ -37,6 +37,8 @@ async def main():
         await loadChannels(conn)
 
         print("downloading content", flush=True)
+        if not os.path.exists(discord.configFolder):
+            os.mkdir(discord.configFolder)
         await discord.asyncFetchAllFiles(conn)
         print("done", flush=True)
 
